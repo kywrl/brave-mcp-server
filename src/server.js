@@ -13,12 +13,20 @@
  * 二次回调，保持工具签名精简。
  */
 
+import { readFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { readConfig } from './brave.js';
 import { callTool, errorResult, TOOLS } from './tools.js';
 
 export const SERVER_NAME = 'brave-search';
-export const SERVER_VERSION = '1.0.0';
+
+/**
+ * 版本号取自 package.json，避免和实际发布版本脱节——硬编码的话，
+ * 发 1.0.1 之后 initialize 仍会自报 1.0.0，客户端排查问题时会被带偏。
+ */
+export const SERVER_VERSION = JSON.parse(
+  readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
+).version;
 
 const DEFAULT_PROTOCOL_VERSION = '2024-11-05';
 
