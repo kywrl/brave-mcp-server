@@ -20,7 +20,7 @@ Claude Code 等 MCP 客户端调用。
     "brave-search": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "brave-mcp-server"],
+      "args": ["-y", "brave-mcp-server@latest"],
       "env": {
         "BRAVE_API_KEY": "你的订阅令牌"
       }
@@ -36,7 +36,7 @@ Claude Code 也可以用命令写入同样一段配置：
 ```bash
 claude mcp add brave-search --scope user \
   -e BRAVE_API_KEY=你的订阅令牌 \
-  -- npx -y brave-mcp-server
+  -- npx -y brave-mcp-server@latest
 ```
 
 ### 环境变量
