@@ -92,17 +92,43 @@ export function startServer(options = {}) {
     return;
   }
 
-  const send = (message) => output.write(`${JSON.stringify(message)}\n`);
+  // stdout 接管道时 write 是异步的。这里跟踪在途写入，只是为了知道
+  // 「什么时候可以退」——真正的退出交给事件循环自然排空，见下面
+  // shutdownIfDrained 的说明。
+  let pendingWrites = 0;
+  const send = (message) => {
+    pendingWrites += 1;
+    output.write(`${JSON.stringify(message)}\n`, () => {
+      pendingWrites -= 1;
+      shutdownIfDrained();
+    });
+  };
 
   const rl = createInterface({ input, crlfDelay: Infinity });
 
   // 在途请求计数：stdin 关闭时可能还有 tools/call 没跑完（检索要几秒），
-  // 直接 exit 会把已经发出去的响应丢掉。等它们落地再退。
+  // 直接退出会把已经发出去的响应丢掉。
   const inFlight = new Set();
   let closing = false;
-  const exitWhenDrained = () => {
-    if (closing && inFlight.size === 0) exit(0);
-  };
+  let exiting = false;
+
+  /**
+   * 等请求和写入都落地后，把 stdin 解绑，让事件循环自然结束。
+   *
+   * 这里刻意不调用 process.exit()：在 stdin 已关闭、且本函数是由 stdout
+   * 写回调驱动的情况下，强制退出会撞上 libuv 正在关闭 async handle 的时序，
+   * Windows 上稳定复现
+   *   Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), file src\win\async.c
+   * 并让退出码变成 127——调用方会误以为服务器崩了。解绑 stdin 之后没有
+   * 待处理的 handle，进程会以 0 自行退出。
+   */
+  function shutdownIfDrained() {
+    if (exiting || !closing) return;
+    if (inFlight.size > 0 || pendingWrites > 0) return;
+    exiting = true;
+    input.unref?.();
+    output.unref?.();
+  }
 
   rl.on('line', (line) => {
     const trimmed = line.trim();
@@ -130,14 +156,14 @@ export function startServer(options = {}) {
       })
       .finally(() => {
         inFlight.delete(task);
-        exitWhenDrained();
+        shutdownIfDrained();
       });
     inFlight.add(task);
   });
 
   rl.on('close', () => {
     closing = true;
-    exitWhenDrained();
+    shutdownIfDrained();
   });
 
   log(`已启动 v${SERVER_VERSION}${process.env.BRAVE_MCP_LOG_LEVEL === 'debug' ? '（debug 日志已开启）' : ''}`);
