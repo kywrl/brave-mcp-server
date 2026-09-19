@@ -1,6 +1,6 @@
 {
   "name": "brave-mcp-server",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Brave Search API 的 MCP 服务器，把网页搜索端点暴露成 web_search 工具",
   "type": "module",
   "license": "MIT",
