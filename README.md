@@ -4,29 +4,15 @@ Brave Search API 的 [MCP](https://modelcontextprotocol.io) 服务器。把 Brav
 Web Search 端点（`GET /res/v1/web/search`）暴露成单个 `web_search` 工具，供
 Claude Code 等 MCP 客户端调用。
 
-服务器用 stdio 传输，stdout 只写 JSON-RPC，日志走 stderr。
+服务器用 stdio 传输，stdout 只写 JSON-RPC，日志走 stderr。由 `npx` 按需拉起，
+不需要预先安装。
 
-## 安装
+## 使用
 
-```bash
-npm install -g brave-mcp-server
-```
+### 配置
 
-或直接由 `npx` 按需拉取，无需预先安装（见下面的配置示例）。
-
-## 配置
-
-### Claude Code
-
-```bash
-claude mcp add brave-search --scope user \
-  -e BRAVE_API_KEY=你的订阅令牌 \
-  -- npx -y brave-mcp-server
-```
-
-### 手写 JSON
-
-写在 `~/.claude.json` 的顶层 `mcpServers` 里：
+在 MCP 客户端的配置文件里加一条即可。Claude Code 写在 `~/.claude.json` 顶层的
+`mcpServers` 里：
 
 ```json
 {
@@ -43,23 +29,26 @@ claude mcp add brave-search --scope user \
 }
 ```
 
-开发时想直接跑本地源码，把 `args` 指向仓库目录即可：
+改完重启客户端生效。
 
-```json
-"args": ["-y", "D:/workspace/brave-mcp-server"]
+Claude Code 也可以用命令写入同样一段配置：
+
+```bash
+claude mcp add brave-search --scope user \
+  -e BRAVE_API_KEY=你的订阅令牌 \
+  -- npx -y brave-mcp-server
 ```
 
-## 环境变量
+### 环境变量
 
 | 变量 | 必填 | 说明 |
 | --- | --- | --- |
 | `BRAVE_API_KEY` | 是 | Brave Search 订阅令牌，也可用 `BRAVE_SEARCH_API_KEY` |
 | `BRAVE_BASE_URL` | 否 | 上游地址，默认 `https://api.search.brave.com` |
-| `BRAVE_MCP_LOG_LEVEL` | 否 | 设为 `debug` 时启动日志更详细 |
 
 缺少 API key 时服务器会打印一行说明并以退出码 1 结束，而不是带着空 key 去请求。
 
-## 工具：`web_search`
+### 工具：`web_search`
 
 | 参数 | 类型 | 说明 |
 | --- | --- | --- |
@@ -83,22 +72,9 @@ claude mcp add brave-search --scope user \
 `enable_rich_callback`、`include_fetch_metadata`——对检索结果影响很小，
 或需要二次回调，为了让工具签名保持精简而略去。
 
-## 本地开发
+## 开发
 
-```bash
-npm start
-```
-
-手动跑一轮协议交互：
-
-```bash
-printf '%s\n' \
-  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' \
-  '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"web_search","arguments":{"q":"hello"}}}' \
-| BRAVE_API_KEY=你的令牌 node bin/brave-mcp-server.js
-```
-
-## 代码结构
+### 代码结构
 
 | 文件 | 职责 |
 | --- | --- |
@@ -107,6 +83,33 @@ printf '%s\n' \
 | `src/tools.js` | 工具声明、参数校验与执行 |
 | `src/brave.js` | Brave API 客户端与错误整理 |
 | `src/format.js` | 响应渲染成纯文本 |
+
+### 本地运行
+
+```bash
+BRAVE_API_KEY=你的令牌 npm start
+```
+
+手动跑一轮协议交互（stdin 每行一条 JSON-RPC 消息）：
+
+```bash
+printf '%s\n' \
+  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' \
+  '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"web_search","arguments":{"q":"hello"}}}' \
+| BRAVE_API_KEY=你的令牌 node bin/brave-mcp-server.js
+```
+
+### 让客户端跑本地源码
+
+把配置里的 `args` 指向仓库目录即可：
+
+```json
+"args": ["-y", "D:/workspace/brave-mcp-server"]
+```
+
+注意别在仓库目录里执行这条 npx——npx 会优先解析当前目录的同名包，报
+`brave-mcp-server 不是内部或外部命令`。从别的目录调用，或者直接用
+`node bin/brave-mcp-server.js`。
 
 ## License
 
